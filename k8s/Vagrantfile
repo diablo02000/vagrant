@@ -45,6 +45,8 @@ Vagrant.configure("2") do |config|
       # Enable provisioning with a shell script.
       # Boostrap VMs config.
       cfg.vm.provision "shell", path: "../common/bootstrap.sh"
+      # Install k8s reaquirements
+      cfg.vm.provision "shell", path: "./k8s-requirements.sh"
     end
   end
 
