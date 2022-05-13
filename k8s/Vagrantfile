@@ -8,9 +8,16 @@
 # Load plugins configuration
 plugins_cfg = File.expand_path('../../common/plugins-config', __FILE__)
 load plugins_cfg if File.exists?(plugins_cfg)
+
+# Number of node to provision
+VM_COUNT_MASTER_NODE=1
+VM_COUNT_WORKER_NODE=3
+
+# VMs prefix name
+VM_PREFIX_NAME="kube"
+
 #
 # This Vagrantfile is setup for VirtualBox.
-
 Vagrant.configure("2") do |config|
   # The most common configuration options are documented and commented below.
   # For a complete reference, please see the online documentation at
@@ -20,16 +27,32 @@ Vagrant.configure("2") do |config|
   # boxes at https://vagrantcloud.com/search.
   config.vm.box = "debian/bullseye64"
 
-
-  # Define number of VMs to deploy
-  vm_count = 3
-
-  # Define vm prefix name
-  vm_prefix_name = "kube"
-
-  (1..vm_count).each do |idx|
+  (1..VM_COUNT_MASTER_NODE).each do |idx|
     # Define vm hostname
-    vm_name = "#{vm_prefix_name}#{idx}"
+    vm_name = "#{VM_PREFIX_NAME}-master#{idx}"
+
+    config.vm.define vm_name do |cfg|
+      cfg.vm.hostname = vm_name 
+      cfg.vm.network "private_network", type: "dhcp"
+
+      # Customize Virtualbox VM
+      cfg.vm.provider "virtualbox" do |v|
+        v.customize [ "modifyvm", :id, "--name", vm_name ]
+        v.customize [ "modifyvm", :id, "--ioapic", "on" ]
+        v.customize [ "modifyvm", :id, "--nictype1", "virtio" ]
+      end
+
+      # Enable provisioning with a shell script.
+      # Boostrap VMs config.
+      cfg.vm.provision "shell", path: "../common/bootstrap.sh"
+      # Install k8s reaquirements
+      cfg.vm.provision "shell", path: "./k8s-requirements.sh"
+    end
+  end
+
+  (1..VM_COUNT_WORKER_NODE).each do |idx|
+    # Define vm hostname
+    vm_name = "#{VM_PREFIX_NAME}-worker#{idx}"
 
     config.vm.define vm_name do |cfg|
       cfg.vm.hostname = vm_name 
