@@ -9,6 +9,9 @@ declare -r OS="Debian_10"
 # Define cri-o version to install
 declare -r CRIO_VERSION="1.23"
 
+# Define path to shared folder
+declare -r ROOT_SHARED_FOLDER="/vagrant/trusted.gpg.d"
+
 ########
 # Swap #
 ########
@@ -17,11 +20,16 @@ sudo swapoff -a
 # Disable swap after reboot
 sudo sed -i '/ swap / s/^/#/' /etc/fstab
 
+# Ensure shared folder exist
+if [[ ! -d "${ROOT_SHARED_FOLDER}" ]];
+then
+	mkdir "${ROOT_SHARED_FOLDER}"
+fi
+
 ##################
 # Kernel Modules #
 ##################
 # Ensure overlay and br_netfilter modules are loaded after reboot
-echo -e "Ensure overlay and br_netfilter modules are loaded at startup."
 cat <<EOF | sudo tee /etc/modules-load.d/containerd.conf
 overlay
 br_netfilter
@@ -45,7 +53,6 @@ fi
 # Network #
 ###########
 # Setup bridge and ip forward.
-echo -e "Setup bridge and ip forwarding."
 cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
 net.ipv4.ip_forward = 1
 net.bridge.bridge-nf-call-ip6tables = 1
@@ -66,15 +73,15 @@ deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stabl
 EOF
 
 # Add cri-o GPG key is not present on /vagrant share
-if [[ ! -f /vagrant/libcontainers-crio-archive-keyring.gpg ]];
+if [[ ! -f "${ROOT_SHARED_FOLDER}/libcontainers-crio-archive-keyring.gpg" ]];
 then	
 	curl -L https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:$CRIO_VERSION/$OS/Release.key | sudo gpg --batch --dearmor -o /etc/apt/trusted.gpg.d/libcontainers-crio-archive-keyring.gpg
 	curl -L https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/Release.key | sudo gpg --batch --dearmor -o /etc/apt/trusted.gpg.d/libcontainers-archive-keyring.gpg
-	cp /etc/apt/trusted.gpg.d/libcontainers-crio-archive-keyring.gpg /vagrant/libcontainers-crio-archive-keyring.gpg
-	cp /etc/apt/trusted.gpg.d/libcontainers-archive-keyring.gpg /vagrant/libcontainers-archive-keyring.gpg
+	cp /etc/apt/trusted.gpg.d/libcontainers-crio-archive-keyring.gpg "${ROOT_SHARED_FOLDER}/libcontainers-crio-archive-keyring.gpg"
+	cp /etc/apt/trusted.gpg.d/libcontainers-archive-keyring.gpg "${ROOT_SHARED_FOLDER}/libcontainers-archive-keyring.gpg"
 else
-	cat /vagrant/libcontainers-crio-archive-keyring.gpg | sudo gpg --batch --dearmor -o /etc/apt/trusted.gpg.d/libcontainers-crio-archive-keyring.gpg
-	cat /vagrant/libcontainers-archive-keyring.gpg | sudo gpg --batch --dearmor -o /etc/apt/trusted.gpg.d/libcontainers-archive-keyring.gpg
+	cat "${ROOT_SHARED_FOLDER}/libcontainers-crio-archive-keyring.gpg" | sudo gpg --batch --dearmor -o /etc/apt/trusted.gpg.d/libcontainers-crio-archive-keyring.gpg
+	cat "${ROOT_SHARED_FOLDER}/libcontainers-archive-keyring.gpg" | sudo gpg --batch --dearmor -o /etc/apt/trusted.gpg.d/libcontainers-archive-keyring.gpg
 fi
 
 # Refresh repository
@@ -91,16 +98,15 @@ sudo systemctl start crio.service
 # Kubernetes #
 ##############
 # Get public GPG key for apt.kubernetes.io repository
-if [[ ! -f /vagrant/kubernetes.gpg ]];
+if [[ ! -f "${ROOT_SHARED_FOLDER}/kubernetes.gpg" ]];
 then
 	curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg --batch --dearmor -o /etc/apt/trusted.gpg.d/kubernetes.gpg
-	cp /etc/apt/trusted.gpg.d/kubernetes.gpg /vagrant/kubernetes.gpg
+	cp /etc/apt/trusted.gpg.d/kubernetes.gpg "${ROOT_SHARED_FOLDER}/kubernetes.gpg"
 else
-	cat /vagrant/kubernetes.gpg | sudo gpg --batch --dearmor -o /etc/apt/trusted.gpg.d/kubernetes.gpg
+	cat "${ROOT_SHARED_FOLDER}/kubernetes.gpg" | sudo gpg --batch --dearmor -o /etc/apt/trusted.gpg.d/kubernetes.gpg
 fi
 
 # Add kubernetes repository configuration
-echo -e "Add apt.kubernetes.io repository."
 cat <<EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list
 deb https://apt.kubernetes.io/ kubernetes-xenial main
 EOF
@@ -109,5 +115,4 @@ EOF
 sudo apt-get update
 
 # Install kubeadm
-echo -e "Install k8s administration tool."
 sudo apt-get install -y kubelet kubeadm kubectl
