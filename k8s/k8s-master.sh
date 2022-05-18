@@ -15,6 +15,9 @@ declare -r POD_CIDR="172.16.0.0/16"
 # Define path to shared folder
 declare -r ROOT_SHARED_FOLDER="/vagrant/k8s-config"
 
+# Define vagrant home directory
+declare -r VAGRANT_HOME_DIR="/home/vagrant"
+
 # Define Kubernetes dashboard version
 declare -r K8S_DASHBOARD_VERSION="v2.5.1"
 
@@ -27,12 +30,13 @@ sudo kubeadm init --apiserver-advertise-address="${MASTER_IP}" --apiserver-cert-
 # Setup credential configuration for root and vagrant user
 mkdir -p "${HOME}/.kube"
 sudo cp -i /etc/kubernetes/admin.conf "${HOME}/.kube/config"
-sudo chown "$(id -u)":"$(id -g)" "${HOME}/.kube/config"
+sudo chown root:root "${HOME}/.kube/config"
 
-sudo -i -u vagrant bash << EOF
-mkdir -p ${HOME}/.kube
-sudo cp -i /etc/kubernetes/admin.conf ${HOME}/.kube/
-sudo chown "$(id -u)":"$(id -g)" ${HOME}/.kube/config
+# Setup credential configuration for vagrant user
+sudo -i -u vagrant bash <<EOF
+mkdir -p ${VAGRANT_HOME_DIR}/.kube
+sudo cp -i /etc/kubernetes/admin.conf ${VAGRANT_HOME_DIR}/.kube/config
+sudo chown 1000:1000 ${VAGRANT_HOME_DIR}/.kube/config
 EOF
 
 # Clean older config in shared folder
